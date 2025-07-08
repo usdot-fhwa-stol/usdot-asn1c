@@ -291,9 +291,12 @@ static int _range_merge_in(asn1cnst_range_t *into, asn1cnst_range_t *cr) {
 
 	into->not_OER_visible |= cr->not_OER_visible;
 	into->not_PER_visible |= cr->not_PER_visible;
+	into->not_JER_visible |= cr->not_JER_visible;
 	into->extensible |= cr->extensible;
-	if(into->extensible)
+	if(into->extensible) {
 		into->not_OER_visible = 1;
+		into->not_JER_visible = 1;
+    }
 
     into->narrowing = _softest_narrowing(into, cr);
 
@@ -592,12 +595,15 @@ _range_intersection(asn1cnst_range_t *range, const asn1cnst_range_t *with, int s
     if(is_oer) {
         assert(range->extensible == 0);
         assert(range->not_OER_visible == 0);
+        assert(range->not_JER_visible == 0);
         assert(with->extensible == 0);
         assert(with->not_OER_visible == 0);
+        assert(with->not_JER_visible == 0);
         if(range->extensible) {
             assert(range->not_OER_visible);
+            assert(range->not_JER_visible);
         }
-        if(range->extensible || range->not_OER_visible) {
+        if(range->extensible || range->not_OER_visible || range->not_JER_visible) {
             /* X.696 #8.2.4 Completely ignore the extensible constraints */
             /* (XXX)(YYY,...) Retain the first one (XXX). */
             asn1cnst_range_t *tmp = _range_new();
@@ -609,16 +615,19 @@ _range_intersection(asn1cnst_range_t *range, const asn1cnst_range_t *with, int s
 
         if(with->extensible) {
             assert(with->not_OER_visible);
+            assert(with->not_JER_visible);
         }
-        if(with->extensible || with->not_OER_visible) {
+        if(with->extensible || with->not_OER_visible || with->not_JER_visible) {
             /* X.696 #8.2.4 Completely ignore the extensible constraints */
             return 0;
         }
     } else {
         /* Propagate errors */
         range->extensible |= with->extensible;
-        if(with->extensible)
+        if(with->extensible) {
             range->not_OER_visible = 1;
+            range->not_JER_visible = 1;
+        }
         range->not_PER_visible |= with->not_PER_visible;
     }
 	range->empty_constraint |= with->empty_constraint;
@@ -917,6 +926,11 @@ asn1constraint_compute_PER_range(const char *dbg_name, asn1p_expr_type_e expr_ty
     return range;
 }
 
+asn1cnst_range_t *
+asn1constraint_compute_JER_range(const char *dbg_name, asn1p_expr_type_e expr_type, const asn1p_constraint_t *ct, enum asn1p_constraint_type_e requested_ct_type, const asn1cnst_range_t *minmax, int *exmet, enum cpr_flags cpr_flags) {
+    return asn1constraint_compute_constraint_range(dbg_name, expr_type, ct, requested_ct_type, minmax, exmet, cpr_flags | CPR_strict_JER_visibility);
+}
+
 static asn1cnst_range_t *
 asn1f_real_range_from_WCOMPS(const char *dbg_name,
                              const asn1p_constraint_t *ct) {
@@ -1133,6 +1147,11 @@ asn1constraint_compute_constraint_range(
         return range;
     }
 
+    if(!ct
+       || (range->not_JER_visible && (cpr_flags & CPR_strict_JER_visibility))) {
+        return range;
+    }
+
 	switch(ct->type) {
 	case ACT_EL_VALUE:
 		vmin = vmax = ct->value;
@@ -1148,6 +1167,7 @@ asn1constraint_compute_constraint_range(
 		if(!*exmet) {
 			range->extensible = 1;
 			range->not_OER_visible = 1;
+			range->not_JER_visible = 1;
 		} else {
 			_range_free(range);
 			errno = ERANGE;
@@ -1175,8 +1195,10 @@ asn1constraint_compute_constraint_range(
 			if(errno == ERANGE) {
 				range->empty_constraint = 1;
 				range->extensible = 1;
-				if(range->extensible)
+				if(range->extensible) {
 					range->not_OER_visible = 1;
+					range->not_PER_visible = 1;
+                }
 				tmp = range;
 			} else {
 				_range_free(range);
@@ -1195,8 +1217,10 @@ asn1constraint_compute_constraint_range(
 			if(!tmp) {
 				if(errno == ERANGE) {
 					range->extensible = 1;
-					if(range->extensible)
+					if(range->extensible) {
 						range->not_OER_visible = 1;
+						range->not_JER_visible = 1;
+                    }
 					continue;
 				} else {
 					_range_free(range);
@@ -1241,8 +1265,17 @@ asn1constraint_compute_constraint_range(
 				continue;
 			}
 
+			if(tmp->not_JER_visible
+			&& (cpr_flags & CPR_strict_JER_visibility)) {
+                /*
+                 * Ignore not JER-visible
+                 */
+                _range_free(tmp);
+				continue;
+			}
+
 			ret = _range_intersection(range, tmp,
-				ct->type == ACT_CA_SET, cpr_flags & CPR_strict_OER_visibility);
+				ct->type == ACT_CA_SET, cpr_flags & (CPR_strict_OER_visibility | CPR_strict_JER_visibility));
 			_range_free(tmp);
 			if(ret) {
 				_range_free(range);
@@ -1269,6 +1302,7 @@ asn1constraint_compute_constraint_range(
 				if(errno == ERANGE) {
 					range->extensible = 1;
 					range->not_OER_visible = 1;
+					range->not_JER_visible = 1;
 					continue;
 				} else {
 					_range_free(range);
@@ -1284,6 +1318,7 @@ asn1constraint_compute_constraint_range(
 		if(tmp) {
 			tmp->extensible |= range->extensible;
 			tmp->not_OER_visible |= range->not_OER_visible;
+			tmp->not_JER_visible |= range->not_JER_visible;
 			tmp->empty_constraint |= range->empty_constraint;
 			_range_free(range);
 			range = tmp;
@@ -1304,6 +1339,7 @@ asn1constraint_compute_constraint_range(
 				if(errno == ERANGE) {
 					range->extensible = 1;
 					range->not_OER_visible = 1;
+					range->not_JER_visible = 1;
 					continue;
 				} else {
 					_range_free(range);
@@ -1324,6 +1360,7 @@ asn1constraint_compute_constraint_range(
 				 */
 				range->extensible |= tmp->extensible;
 				range->not_OER_visible |= tmp->not_OER_visible;
+				range->not_JER_visible |= tmp->not_JER_visible;
 				_range_free(tmp);
 				continue;
 			}
@@ -1336,8 +1373,10 @@ asn1constraint_compute_constraint_range(
         if(requested_ct_type == ACT_CT_FROM) {
             /*
              * X.696 permitted alphabet constraints are not OER-visible.
+             * X.697 permitted alphabet constraints are not JER-visible.
              */
             range->not_OER_visible = 1;
+            range->not_JER_visible = 1;
             if(range->extensible) {
                 /*
                  * X.691, #9.3.10:
