@@ -147,6 +147,7 @@ uper_encoder.h
 uper_support.h
 uper_opentype.h
 uper_decoder.h uper_decoder.c	# UPER decoding support
+uper_decoder.h asn_decode_error.h asn_decode_error.c	# structured decode-error reporting
 uper_encoder.h uper_encoder.c	# UPER encoding support
 uper_support.h uper_support.c	# UPER parsing
 uper_opentype.h uper_opentype.c	# UPER "open type" handling

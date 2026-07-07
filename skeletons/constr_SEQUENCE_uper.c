@@ -7,6 +7,7 @@
 #include <constr_SEQUENCE.h>
 #include <OPEN_TYPE.h>
 #include <uper_opentype.h>
+#include <asn_decode_error.h>
 
 /*
  * Check whether we are inside the extensions group.
@@ -122,6 +123,8 @@ SEQUENCE_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
         if(rv.code != RC_OK) {
             ASN_DEBUG("Failed decode %s in %s",
                       elm->name, td->name);
+            asn_set_decode_error(td->name, elm->name, (long)(edx + 1),
+                                 pd->moved, rv.code, __FILE__, __LINE__);
             FREEMEM(opres);
             return rv;
         }
@@ -185,6 +188,8 @@ SEQUENCE_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
                                     elm->encoding_constraints.per_constraints,
                                     memb_ptr2, pd);
             if(rv.code != RC_OK) {
+                asn_set_decode_error(td->name, elm->name, (long)(edx + 1),
+                                     pd->moved, rv.code, __FILE__, __LINE__);
                 FREEMEM(epres);
                 return rv;
             }

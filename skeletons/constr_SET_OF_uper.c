@@ -5,6 +5,7 @@
  */
 #include <asn_internal.h>
 #include <constr_SET_OF.h>
+#include <asn_decode_error.h>
 
 asn_dec_rval_t
 SET_OF_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
@@ -19,6 +20,7 @@ SET_OF_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
     const asn_per_constraint_t *ct;
     int repeat = 0;
     ssize_t nelems;
+    size_t total_decoded = 0;
 
     if(ASN__STACK_OVERFLOW_CHECK(opt_codec_ctx))
         ASN__DECODE_FAILED;
@@ -78,6 +80,7 @@ SET_OF_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
                         /* Protect from SET OF NULL compression bombs. */
                         ASN__DECODE_FAILED;
                     }
+                    total_decoded++;
                     continue;
                 }
                 ASN_DEBUG("Failed to add element into %s",
@@ -88,6 +91,8 @@ SET_OF_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
                 ASN_DEBUG("Failed decoding %s of %s (SET OF)",
                           elm->type->name, td->name);
             }
+            asn_set_decode_error(td->name, 0, (long)(total_decoded + 1),
+                                 pd->moved, rv.code, __FILE__, __LINE__);
             if(ptr) ASN_STRUCT_FREE(*elm->type, ptr);
             return rv;
         }

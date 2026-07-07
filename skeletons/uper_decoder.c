@@ -1,6 +1,7 @@
 #include <asn_application.h>
 #include <asn_internal.h>
 #include <uper_decoder.h>
+#include <asn_decode_error.h>
 
 /*
  * Decode a "Production of a complete encoding", X.691#10.1.
@@ -45,6 +46,8 @@ uper_decode(const asn_codec_ctx_t *opt_codec_ctx,
     asn_codec_ctx_t s_codec_ctx;
 	asn_dec_rval_t rval;
 	asn_per_data_t pd;
+
+	asn_clear_decode_error();
 
 	if(skip_bits < 0 || skip_bits > 7
 	|| unused_bits < 0 || unused_bits > 7

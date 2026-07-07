@@ -6,6 +6,7 @@
 #include <asn_internal.h>
 #include <constr_CHOICE.h>
 #include <uper_opentype.h>
+#include <asn_decode_error.h>
 
 asn_dec_rval_t
 CHOICE_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
@@ -48,16 +49,22 @@ CHOICE_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
         if(value < 0) ASN__DECODE_STARVED;
         ASN_DEBUG("CHOICE %s got index %d in range %d",
                   td->name, value, ct->range_bits);
-        if(value > ct->upper_bound)
+        if(value > ct->upper_bound) {
+            asn_set_decode_error(td->name, 0, (long)value, pd->moved,
+                                 RC_FAIL, __FILE__, __LINE__);
             ASN__DECODE_FAILED;
+        }
     } else {
         if(specs->ext_start == -1)
             ASN__DECODE_FAILED;
         value = uper_get_nsnnwn(pd);
         if(value < 0) ASN__DECODE_STARVED;
         value += specs->ext_start;
-        if((unsigned)value >= td->elements_count)
+        if((unsigned)value >= td->elements_count) {
+            asn_set_decode_error(td->name, 0, (long)value, pd->moved,
+                                 RC_FAIL, __FILE__, __LINE__);
             ASN__DECODE_FAILED;
+        }
     }
 
     /* Adjust if canonical order is different from natural order */
@@ -90,9 +97,12 @@ CHOICE_decode_uper(const asn_codec_ctx_t *opt_codec_ctx,
                                 memb_ptr2, pd);
     }
 
-    if(rv.code != RC_OK)
+    if(rv.code != RC_OK) {
         ASN_DEBUG("Failed to decode %s in %s (CHOICE) %d",
                   elm->name, td->name, rv.code);
+        asn_set_decode_error(td->name, elm->name, (long)(value + 1),
+                             pd->moved, rv.code, __FILE__, __LINE__);
+    }
     return rv;
 }
 

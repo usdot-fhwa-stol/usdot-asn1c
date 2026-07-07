@@ -64,6 +64,7 @@ libasn1cskeletons_la_SOURCES =                  \
     VisibleString.c VisibleString.h             \
     asn_SEQUENCE_OF.c asn_SEQUENCE_OF.h         \
     asn_SET_OF.c asn_SET_OF.h                   \
+    asn_decode_error.c asn_decode_error.h       \
     asn_application.c asn_application.h         \
     asn_config.h                                \
     asn_system.h asn_codecs.h                   \
