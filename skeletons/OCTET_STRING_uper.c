@@ -12,6 +12,8 @@
         asn_dec_rval_t tmprval;\
         tmprval.code = _code;\
         tmprval.consumed = consumed_myself;\
+        tmprval.failed_type =\
+            (_code == RC_OK) ? NULL : (td ? td->name : NULL);\
         return tmprval;\
     } while(0)
 
